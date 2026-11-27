@@ -1,0 +1,1074 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Store console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M4 3h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-4 3.5V14H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z' fill='%231d5fbf'/%3E%3C/svg%3E">
+<style>
+/* Achromatic ledger: no colour in the chrome. The one hue (#1d5fbf) marks held stock and the
+   15-minute hold clocks; status pills are the only other colour. Ground is a shop's stone.
+
+   Grid, at 1440: canvas = 1440 - 240 sidebar - 2 x 32 padding = 1136.
+   Overview row 1: 3 columns of 370.67 + 2 x 12 gaps = 1136; orders span 2 (753.33), shelf 1.
+   Overview row 2: 2 x 562 + 12 = 1136. */
+:root {
+  --ground: #f4f3f1; --surface: #ffffff; --raised: #f3f2f0; --active: #e7e6e3;
+  --border: #e6e6e6; --rule: #f0f0f0; --control: #d4d4d4;
+  --text: #0a0a0a; --muted: #6b6b6b;
+  --primary: #141414; --primary-ink: #ffffff; --secondary: #e5e5e5;
+  --hue: #1d5fbf; --hue-pale: #dbe6f6; --sold: #c9c9c9;
+  --positive: #2e7d32; --negative: #c4242a; --warning: #92400e;
+  --pill-positive-bg: #dcfae5; --pill-positive-ink: #04250e;
+  --pill-negative-bg: #ffedea; --pill-negative-ink: #831c1e;
+  --pill-warning-bg: #fffbeb; --pill-warning-ink: #92400e;
+  --pill-neutral-bg: #eeeeee; --pill-neutral-ink: #3d3d3d;
+  --font: "Geist", Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "Geist Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --fs-title: 24px; --fs-section: 16px; --fs-kpi: 30px; --fs-body: 14px; --fs-small: 12px;
+  --sidebar: 240px; --pad: 32px; --gap: 12px; --card-pad: 20px;
+  --radius-card: 8px; --radius-control: 6px; --control-height: 36px; --row: 44px;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #000000; --surface: #111111; --raised: #1b1b1b; --active: #222222;
+    --border: #262626; --rule: #1c1c1c; --control: #444444;
+    --text: #ffffff; --muted: #a8a8a8;
+    --primary: #ffffff; --primary-ink: #000000; --secondary: #262626;
+    --hue: #5b93e6; --hue-pale: #16243a; --sold: #4a4a4a;
+    --positive: #3fc07a; --negative: #e5566f; --warning: #e5a93b;
+    --pill-positive-bg: #172a1d; --pill-positive-ink: #3fc07a;
+    --pill-negative-bg: #2c1a20; --pill-negative-ink: #e5566f;
+    --pill-warning-bg: #2b2414; --pill-warning-ink: #e5a93b;
+    --pill-neutral-bg: #222222; --pill-neutral-ink: #e0e0e0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --ground: #000000; --surface: #111111; --raised: #1b1b1b; --active: #222222;
+  --border: #262626; --rule: #1c1c1c; --control: #444444;
+  --text: #ffffff; --muted: #a8a8a8;
+  --primary: #ffffff; --primary-ink: #000000; --secondary: #262626;
+  --hue: #5b93e6; --hue-pale: #16243a; --sold: #4a4a4a;
+  --positive: #3fc07a; --negative: #e5566f; --warning: #e5a93b;
+  --pill-positive-bg: #172a1d; --pill-positive-ink: #3fc07a;
+  --pill-negative-bg: #2c1a20; --pill-negative-ink: #e5566f;
+  --pill-warning-bg: #2b2414; --pill-warning-ink: #e5a93b;
+  --pill-neutral-bg: #222222; --pill-neutral-ink: #e0e0e0;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { margin: 0; background: var(--ground); color: var(--text); font: var(--fs-body)/20px var(--font); -webkit-font-smoothing: antialiased; }
+h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+button, input { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--hue); outline-offset: 2px; border-radius: 4px; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); font-size: 13px; }
+.muted { color: var(--muted); }
+.money { font-weight: 700; font-variant-numeric: tabular-nums; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- shell ---------- */
+.app { display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); min-height: 100svh; }
+.sidebar { position: sticky; top: 0; height: 100svh; display: flex; flex-direction: column; padding: 20px 12px 16px; overflow: auto; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 0 10px 0 12px; height: 36px; }
+.brand svg { flex: none; }
+.brand b { font-size: 15px; font-weight: 500; }
+.brand span { display: block; font-size: var(--fs-small); line-height: 16px; color: var(--muted); }
+.nav { margin-top: 28px; display: grid; gap: 2px; }
+.nav a { display: flex; align-items: center; gap: 10px; height: 32px; padding: 0 12px; border-radius: 6px; color: var(--muted); transition: background-color 150ms, color 150ms; }
+.nav a svg { flex: none; width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.nav a:hover { color: var(--text); background: var(--raised); }
+.nav a[aria-current="page"] { background: var(--active); color: var(--text); }
+.setup { margin-top: auto; padding: 16px 12px 0; }
+.setup h2 { font-size: var(--fs-small); font-weight: 400; color: var(--muted); margin-bottom: 8px; }
+.setup dl { display: grid; grid-template-columns: 1fr auto; row-gap: 6px; column-gap: 8px; font-size: 13px; }
+.setup dt { color: var(--muted); }
+.setup dd { text-align: right; display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.dot { width: 6px; height: 6px; border-radius: 50%; background: var(--sold); flex: none; }
+.dot.on { background: var(--positive); }
+.dot.warn { background: var(--warning); }
+.setup .docs { display: inline-flex; margin-top: 14px; font-size: 13px; color: var(--muted); }
+.setup .docs:hover { color: var(--text); }
+
+.topbar { display: none; }
+.canvas { min-width: 0; padding: 28px var(--pad) 48px; }
+
+/* ---------- title row ---------- */
+.head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 0 calc(var(--card-pad) + 1px); margin-bottom: 20px; min-height: 52px; }
+.head h1 { font-size: var(--fs-title); line-height: 32px; font-weight: 500; letter-spacing: -0.01em; }
+.head p { margin-top: 2px; color: var(--muted); font-size: 15px; line-height: 22px; }
+.head p strong { color: var(--text); font-weight: 500; }
+.head-side { display: flex; align-items: center; gap: 12px; flex: none; }
+.fresh { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.fresh .live { width: 6px; height: 6px; border-radius: 50%; background: var(--positive); }
+.fresh.paused .live { background: var(--sold); }
+.fresh.failed { color: var(--negative); }
+.fresh.failed .live { background: var(--negative); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: var(--control-height); padding: 0 14px; border-radius: var(--radius-control); border: 0; font-weight: 500; white-space: nowrap; cursor: pointer; transition: transform 120ms var(--ease), background-color 150ms, opacity 150ms; }
+.btn:active { transform: scale(0.97); }
+.btn.primary { background: var(--primary); color: var(--primary-ink); }
+.btn.primary:hover { opacity: 0.88; }
+.btn.secondary { background: var(--secondary); color: var(--text); }
+.btn.secondary:hover { background: var(--active); }
+.btn.ghost { height: 30px; padding: 0 10px; background: transparent; border: 1px solid var(--control); font-size: 13px; }
+.btn.ghost:hover { background: var(--raised); }
+.btn.text { height: auto; padding: 0; background: none; color: var(--text); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--control); }
+
+/* ---------- cards ---------- */
+.grid { display: grid; gap: var(--gap); }
+.row-1 { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: stretch; }
+.row-1 > .span-2 { grid-column: span 2; }
+.row-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: var(--gap); align-items: stretch; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); min-width: 0; display: flex; flex-direction: column; }
+.card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 18px var(--card-pad) 12px; }
+.card-head h2 { font-size: var(--fs-section); line-height: 24px; font-weight: 500; }
+.card-head .aside { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.card-head a.aside:hover { color: var(--text); }
+.card-foot { margin-top: auto; padding: 12px var(--card-pad) 16px; display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }
+.card-foot a { color: var(--text); }
+.card-foot a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+/* KPIs as the orders list's tabs */
+.tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--border); margin: 0 var(--card-pad); }
+.tabs.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.tab { position: relative; text-align: left; padding: 2px 16px 14px; border: 0; background: none; cursor: pointer; border-left: 1px solid var(--rule); }
+.tab:first-child { padding-left: 0; border-left: 0; }
+.tab .label { display: block; font-size: 13px; color: var(--muted); transition: color 150ms; }
+.tab .value { display: block; font-size: var(--fs-kpi); line-height: 38px; font-weight: 400; letter-spacing: -0.02em; margin-top: 2px; font-variant-numeric: tabular-nums; }
+.tab .sub { display: block; font-size: var(--fs-small); color: var(--muted); font-variant-numeric: tabular-nums; }
+.tab::after { content: ""; position: absolute; left: 0; right: 16px; bottom: -1px; height: 2px; background: transparent; transition: background-color 150ms; }
+.tab:first-child::after { left: 0; }
+.tab:not(:first-child)::after { left: 16px; }
+.tab:hover .label { color: var(--text); }
+.tab[aria-selected="true"] .label { color: var(--text); }
+.tab[aria-selected="true"] .value { font-weight: 500; }
+.tab[aria-selected="true"]::after { background: var(--text); }
+.value.zero { color: var(--muted); }
+
+/* order rows */
+.orders { padding: 4px 0 0; }
+.subhead { padding: 14px var(--card-pad) 6px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--rule); }
+.quiet { padding: 14px var(--card-pad) 0; color: var(--muted); font-size: 13px; }
+.order { display: grid; grid-template-columns: minmax(0, 1fr) 168px 96px 132px; align-items: center; gap: 16px; min-height: 64px; padding: 10px var(--card-pad); border-top: 1px solid var(--rule); cursor: pointer; transition: background-color 150ms; }
+.order:first-child { border-top: 0; }
+.order:hover { background: var(--raised); }
+.order[aria-current="true"] { background: var(--active); }
+.who { min-width: 0; }
+.who .line1 { display: flex; gap: 8px; align-items: baseline; min-width: 0; }
+.who .id { color: var(--muted); font-variant-numeric: tabular-nums; flex: none; }
+.who .name { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.who .line2 { margin-top: 2px; font-size: 13px; line-height: 18px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.order .total { text-align: right; }
+.order .act { display: flex; justify-content: flex-end; }
+
+/* the hold clock: time left of the 15-minute hold, in the one hue */
+.hold { display: grid; gap: 6px; }
+.hold .t { font-size: 13px; line-height: 16px; font-variant-numeric: tabular-nums; }
+.hold .t.late { color: var(--negative); }
+.track { height: 4px; border-radius: 2px; background: var(--hue-pale); overflow: hidden; }
+.track i { display: block; height: 100%; width: 0; background: var(--hue); border-radius: 2px; transition: width 900ms linear; }
+
+.pill { display: inline-flex; align-items: center; height: 22px; padding: 0 8px; border-radius: 999px; font-size: 12px; font-weight: 500; white-space: nowrap; flex: none; }
+.pill.positive { background: var(--pill-positive-bg); color: var(--pill-positive-ink); }
+.pill.negative { background: var(--pill-negative-bg); color: var(--pill-negative-ink); }
+.pill.warning { background: var(--pill-warning-bg); color: var(--pill-warning-ink); }
+.pill.neutral { background: var(--pill-neutral-bg); color: var(--pill-neutral-ink); }
+
+/* shelf */
+.legend { display: flex; gap: 12px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 8px; height: 8px; border-radius: 2px; background: var(--text); }
+.legend i.held { background: var(--hue); }
+.legend i.sold { background: var(--sold); }
+.shelf { padding: 0 var(--card-pad); flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+.item { display: grid; grid-template-columns: minmax(0, 1fr) 104px 44px; align-items: center; gap: 12px; min-height: 37px; border-top: 1px solid var(--rule); }
+.item:first-child { border-top: 0; }
+.item .title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item .count { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+.item .count.out { color: var(--negative); }
+.bar { display: flex; gap: 2px; height: 6px; }
+.bar i { display: block; height: 100%; border-radius: 1px; min-width: 0; }
+.bar .shelf-part { background: var(--text); }
+.bar .held-part { background: var(--hue); }
+.bar .sold-part { background: var(--sold); }
+.bar .empty { flex: 1; background: var(--rule); }
+
+/* people, chats and calls */
+.list > li { border-top: 1px solid var(--rule); }
+.list > li:first-child { border-top: 0; }
+.entry { display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 64px; padding: 10px var(--card-pad); transition: background-color 150ms; }
+a.entry:hover, button.entry:hover { background: var(--raised); }
+.entry[aria-current="true"] { background: var(--active); }
+button.entry { width: 100%; border: 0; background: none; text-align: left; cursor: pointer; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; font-weight: 500; color: #1f1f1f; }
+.entry .who, .entry .line1, .entry .line2 { display: block; min-width: 0; }
+.entry .line1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.entry .end { display: grid; justify-items: end; gap: 4px; font-size: 12px; color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.empty-state { margin: 0 var(--card-pad) var(--card-pad); padding: 14px 16px; border: 1px dashed var(--control); border-radius: 8px; color: var(--muted); font-size: 13px; line-height: 20px; }
+.empty-state strong { color: var(--text); font-weight: 500; }
+.problem { margin: 0 var(--card-pad) var(--card-pad); padding: 12px 14px; border-radius: 8px; background: var(--pill-warning-bg); color: var(--pill-warning-ink); font-size: 13px; line-height: 20px; }
+.skeleton { display: block; height: 14px; border-radius: 3px; background: var(--raised); }
+
+/* ---------- two-pane views ---------- */
+.panes { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: var(--gap); align-items: start; }
+.panes.wide-detail { grid-template-columns: 380px minmax(0, 1fr); }
+.detail { position: sticky; top: 20px; max-height: calc(100svh - 40px); overflow: auto; }
+.detail .card-head { position: sticky; top: 0; background: var(--surface); z-index: 1; border-radius: var(--radius-card) var(--radius-card) 0 0; }
+.back { display: none; }
+.facts { display: grid; grid-template-columns: 132px minmax(0, 1fr); row-gap: 8px; column-gap: 16px; padding: 4px var(--card-pad) 16px; font-size: 14px; }
+.facts dt { color: var(--muted); }
+.facts dd { min-width: 0; overflow-wrap: anywhere; }
+.section-title { padding: 16px var(--card-pad) 8px; font-size: 13px; color: var(--muted); border-top: 1px solid var(--rule); }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th { font-size: 12px; font-weight: 400; color: var(--muted); text-align: left; padding: 0 0 8px; }
+td { padding: 9px 0; border-top: 1px solid var(--rule); vertical-align: top; }
+th + th, td + td { padding-left: 12px; }
+th.num, td.num { text-align: right; }
+.table-wrap { padding: 0 var(--card-pad) 12px; }
+td .sub { display: block; font-size: 12px; color: var(--muted); }
+
+/* conversation */
+.convo { padding: 8px var(--card-pad) 20px; display: grid; gap: 10px; }
+.say { max-width: 78%; padding: 9px 12px; border-radius: 8px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 20px; }
+.say b { font-weight: 600; }
+.say a { text-decoration: underline; text-underline-offset: 3px; }
+.say pre, .say code { font-family: var(--mono); font-size: 13px; }
+.say .from { display: block; font-size: 12px; color: var(--muted); margin-bottom: 2px; }
+.say.customer { background: var(--raised); justify-self: start; }
+.say.aida { border: 1px solid var(--border); justify-self: end; }
+.tool, .note { justify-self: stretch; display: flex; gap: 8px; font-size: 13px; line-height: 18px; color: var(--muted); padding: 0 4px; }
+.tool svg { flex: none; width: 14px; height: 14px; margin-top: 2px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.tool.failed { color: var(--negative); }
+.note { font-size: 12px; }
+.note::before { content: attr(data-label); flex: none; color: var(--text); font-weight: 500; }
+.langs { display: flex; gap: 2px; margin: 16px 0 0; padding: 2px; border-radius: 8px; background: var(--raised); }
+.langs button { flex: 1; min-height: 32px; border: 0; border-radius: 6px; background: none; color: var(--muted); font-size: 13px; cursor: pointer; transition: background-color 150ms, color 150ms; }
+.langs button:hover { color: var(--text); }
+.langs button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 500; box-shadow: 0 0 0 1px var(--border); }
+@media (max-width: 1100px) { .langs button { min-height: 44px; } }
+.line { padding: 6px 0; border-top: 1px solid var(--rule); white-space: pre-wrap; overflow-wrap: anywhere; }
+.line:first-child { border-top: 0; }
+.line b { font-weight: 500; }
+
+/* key form */
+.gate { max-width: 420px; margin: 8vh auto 0; }
+.gate form { display: grid; gap: 10px; padding: 0 var(--card-pad) var(--card-pad); }
+.gate label { font-weight: 500; font-size: 14px; }
+.gate input { height: 40px; padding: 0 12px; border: 1px solid var(--control); border-radius: 8px; background: var(--surface); font-family: var(--mono); }
+.gate p { padding: 0 var(--card-pad) 16px; color: var(--muted); }
+
+@keyframes arrive { from { background-color: var(--hue-pale); } to { background-color: transparent; } }
+.new { animation: arrive 2.4s var(--ease) 1; }
+@media (prefers-reduced-motion: reduce) {
+  .new { animation: none; }
+  .track i { transition: none; }
+  .btn:active { transform: none; }
+}
+
+/* ---------- narrower ---------- */
+@media (max-width: 1280px) {
+  .order { grid-template-columns: minmax(0, 1fr) 140px 88px; }
+  .order .act { display: none; }
+}
+@media (max-width: 1100px) {
+  .app { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  .sidebar { display: none; }
+  .sidebar.open { display: flex; position: fixed; inset: 48px 0 0 0; z-index: 20; height: auto; background: var(--ground); padding: 16px; }
+  .sidebar.open .brand { display: none; }
+  .sidebar.open .nav { margin-top: 0; }
+  .sidebar.open .nav a { height: 44px; }
+  .topbar { display: flex; position: sticky; top: 0; z-index: 21; height: 48px; align-items: center; gap: 10px; padding: 0 16px; background: var(--ground); border-bottom: 1px solid var(--border); }
+  .topbar b { font-weight: 500; }
+  .topbar .where { color: var(--muted); }
+  .topbar button { margin-left: auto; width: 44px; height: 44px; margin-right: -10px; border: 0; background: none; display: grid; place-items: center; cursor: pointer; }
+  .topbar button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; }
+  .canvas { padding: 20px 24px 40px; }
+  .row-1 { grid-template-columns: minmax(0, 1fr); }
+  .row-1 > .span-2 { grid-column: auto; }
+  .item { grid-template-columns: minmax(0, 220px) minmax(0, 1fr) 44px; }
+  .order .act { display: flex; }
+  .order { grid-template-columns: minmax(0, 1fr) 150px 96px 132px; }
+  .panes, .panes.wide-detail { grid-template-columns: minmax(0, 1fr) 360px; }
+  .detail { top: 64px; max-height: calc(100svh - 80px); }
+}
+@media (max-width: 860px) {
+  .head { flex-direction: column; gap: 10px; }
+  .row-2 { grid-template-columns: minmax(0, 1fr); }
+  .panes, .panes.wide-detail { grid-template-columns: minmax(0, 1fr); }
+  .panes.has-detail > .listing { display: none; }
+  .panes:not(.has-detail) > .detail { display: none; }
+  .detail { position: static; max-height: none; }
+  .back { display: inline-flex; }
+  .order .act { display: none; }
+  .order { grid-template-columns: minmax(0, 1fr) 130px 88px; }
+}
+@media (max-width: 640px) {
+  .canvas { padding: 16px 16px 32px; }
+  .item { grid-template-columns: minmax(0, 1fr) 96px 40px; }
+  .head { flex-direction: column; padding: 0; gap: 8px; margin-bottom: 16px; }
+  .head h1 { font-size: 22px; line-height: 28px; }
+  .head-side { flex-wrap: wrap; }
+  .card-head { padding: 16px 16px 10px; }
+  .tabs, .tabs.five { grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 0; margin: 0 16px; gap: 6px; padding-bottom: 12px; }
+  .tab, .tab:first-child { border: 0; border-radius: 8px; padding: 8px 10px; background: var(--raised); }
+  .tab::after { display: none; }
+  .tab[aria-selected="true"] { background: var(--active); }
+  .tab .value { font-size: 24px; line-height: 30px; }
+  .tabs.five .tab:last-child { grid-column: 1 / -1; }
+  .order { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "who total" "hold hold"; row-gap: 10px; padding: 12px 16px; }
+  .order .who { grid-area: who; }
+  .order .total { grid-area: total; align-self: start; }
+  .order .hold-cell { grid-area: hold; }
+  .shelf, .table-wrap { padding-left: 16px; padding-right: 16px; }
+  .entry { padding: 10px 16px; }
+  .facts { grid-template-columns: 104px minmax(0, 1fr); padding: 4px 16px 16px; }
+  .section-title, .convo { padding-left: 16px; padding-right: 16px; }
+  .card-foot { padding: 12px 16px 14px; }
+  .empty-state, .problem { margin: 0 16px 16px; }
+  .say { max-width: 92%; }
+  .hide-phone { display: none; }
+  .legend { gap: 8px; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-4 3.5V14H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" fill="var(--hue)"/><circle cx="7" cy="8.5" r="1.2" fill="var(--surface)"/><circle cx="10" cy="8.5" r="1.2" fill="var(--surface)"/><circle cx="13" cy="8.5" r="1.2" fill="var(--surface)"/></svg>
+    <b>Aida</b><span class="where" id="where"></span>
+    <button type="button" id="menu" aria-expanded="false" aria-controls="sidebar" aria-label="Menu" data-t-label="Menu"><svg viewBox="0 0 20 20"><path d="M3 6h14M3 10h14M3 14h14"/></svg></button>
+  </header>
+
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 20 20" aria-hidden="true"><path d="M4 3h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9l-4 3.5V14H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" fill="var(--hue)"/><circle cx="7" cy="8.5" r="1.2" fill="var(--surface)"/><circle cx="10" cy="8.5" r="1.2" fill="var(--surface)"/><circle cx="13" cy="8.5" r="1.2" fill="var(--surface)"/></svg>
+      <div><b>Aida</b><span id="store-name" data-t="Store console">Store console</span></div>
+    </div>
+    <nav class="nav" aria-label="Console">
+      <a href="#/overview" data-view="overview"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg><span data-t="Overview">Overview</span></a>
+      <a href="#/orders" data-view="orders"><svg viewBox="0 0 16 16"><path d="M3 2.5h10v11l-2-1.2-1.5 1.2L8 12.3l-1.5 1.2L5 12.3 3 13.5z"/><path d="M5.5 5.5h5M5.5 8h5"/></svg><span data-t="Orders">Orders</span></a>
+      <a href="#/chats" data-view="chats"><svg viewBox="0 0 16 16"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z"/></svg><span data-t="Chats">Chats</span></a>
+      <a href="#/calls" data-view="calls"><svg viewBox="0 0 16 16"><path d="M4.5 2.5 6.5 5 5.3 6.4a7 7 0 0 0 4.3 4.3L11 9.5l2.5 2-1 2a9.5 9.5 0 0 1-10-10z"/></svg><span data-t="Calls">Calls</span></a>
+      <a href="#/shelf" data-view="shelf"><svg viewBox="0 0 16 16"><path d="M2 13.5h12M3 13.5V8h4v5.5M9 13.5V4h4v9.5"/></svg><span data-t="Shelf">Shelf</span></a>
+    </nav>
+    <div class="langs" role="group" aria-label="Language" data-t-label="Language" id="langs">
+      <button type="button" data-lang="uz" lang="uz">O‘zbekcha</button><button type="button" data-lang="ru" lang="ru">Русский</button><button type="button" data-lang="en" lang="en">English</button>
+    </div>
+    <section class="setup" aria-labelledby="setup-title">
+      <h2 id="setup-title" data-t="Setup">Setup</h2>
+      <dl id="setup"></dl>
+      <a class="docs" href="/docs" target="_blank" rel="noopener" data-t="API docs">API docs</a>
+    </section>
+  </aside>
+
+  <main class="canvas" id="canvas">
+    <div class="head" id="head"></div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<script>
+"use strict";
+// ---------- language ----------
+// English is written where it's used; DICT gives the other two, keyed by the English.
+// A value that is a list holds Russian's three plural forms (1, 2-4, 5+).
+const LANG_NAMES = { uz: "O‘zbekcha", ru: "Русский", en: "English" };
+let LANG = (() => { try { return localStorage.getItem("aida-lang"); } catch (_) { return null; } })();
+if (!LANG_NAMES[LANG]) LANG = LANG_NAMES[document.documentElement.lang] ? document.documentElement.lang : "en";
+
+const DICT = {
+  uz: {
+    "Overview": "Umumiy", "Orders": "Buyurtmalar", "Chats": "Chatlar", "Calls": "Qo‘ng‘iroqlar", "Shelf": "Ombor",
+    "Setup": "Sozlamalar", "API docs": "API hujjatlari", "Store console": "Do‘kon konsoli", "Menu": "Menyu", "Language": "Til",
+    "Today {t}": "Bugun {t}", "Yesterday {t}": "Kecha {t}", "Just now": "Hozirgina", "{n} min ago": "{n} daqiqa oldin", "{n} h ago": "{n} soat oldin",
+    "On hold": "To‘lov kutilmoqda", "Needs a person": "Odam kerak", "Paid": "To‘langan", "Expired": "Muddati o‘tgan", "Expired unpaid": "To‘lanmay qolgan",
+    "Order placed": "Buyurtma berildi", "Escalated": "Odamga o‘tkazildi", "Inquiry only": "Faqat so‘rov",
+    "With a person": "Odam bilan", "Answering": "Javob yozmoqda",
+    "The store answered {s}.": "Do‘kon {s} kodi bilan javob berdi.", "Can't reach the store backend.": "Do‘kon serveriga ulanib bo‘lmadi.",
+    "Store": "Do‘kon", "Connecting": "Ulanmoqda", "Telegram": "Telegram", "Live": "Ishlayapti", "Dry run": "Sinov rejimi",
+    "Admin messages are sent.": "Adminga xabarlar yuboriladi.",
+    "Admin messages are only logged: set TELEGRAM_BOT_TOKEN and ADMIN_CHAT_ID.": "Admin xabarlari faqat logga yoziladi: TELEGRAM_BOT_TOKEN va ADMIN_CHAT_ID ni kiriting.",
+    "Payments": "To‘lovlar", "Demo checkout": "Demo to‘lov", "Payments are confirmed by the gateways.": "To‘lovlarni to‘lov tizimlari tasdiqlaydi.",
+    "Payment links open the demo checkout, which marks orders paid.": "To‘lov havolalari demo sahifani ochadi, u buyurtmani to‘langan deb belgilaydi.",
+    "Summaries": "Xulosalar", "Off": "O‘chiq", "{ai} summarises finished calls.": "{ai} tugagan qo‘ng‘iroqlarning xulosasini yozadi.",
+    "Set {key} to summarise calls.": "Qo‘ng‘iroq xulosalari uchun {key} ni kiriting.",
+    "API key": "API kaliti", "Required": "Talab qilinadi", "Not set": "Kiritilmagan", "The API asks for X-API-Key.": "API X-API-Key so‘raydi.",
+    "Anyone who can reach this server can use the API.": "Bu serverga yeta oladigan har kim API'dan foydalana oladi.",
+    "{e} Last updated {t}.": "{e} Oxirgi yangilanish {t}.", "Paused · updated {t}": "To‘xtatilgan · yangilangan {t}", "Live · updated {t}": "Jonli · yangilangan {t}", "Retry": "Qayta urinish",
+    "{n} orders need a person": "{n} ta buyurtmaga odam kerak", "{n} chats are with a person": "{n} ta chat odam bilan",
+    "{n} orders on hold for {m}": "{n} ta buyurtma {m} ga to‘lov kutmoqda", ", the next hold ends in {t}": ", keyingisi {t} da tugaydi",
+    "No orders yet. They appear here the moment Aida places one.": "Hali buyurtma yo‘q. Aida buyurtma bergan zahoti shu yerda chiqadi.",
+    "Nothing on hold. {n} orders paid for {m} so far.": "To‘lov kutayotgan buyurtma yo‘q. Hozircha {n} ta buyurtma {m} ga to‘langan.",
+    "Pay order #{id} (demo)": "#{id} buyurtmani to‘lash (demo)",
+    "{n} orders · the newest {k} are shown": "{n} ta buyurtma · eng yangi {k} tasi ko‘rsatilgan", "{n} orders since the store opened": "Do‘kon ochilgandan beri {n} ta buyurtma",
+    "{n} conversations on Telegram, most recent first": "Telegramda {n} ta suhbat, eng yangisi birinchi",
+    "{n} finished calls, newest first. Calls in progress appear once they end.": "{n} ta tugagan qo‘ng‘iroq, eng yangisi birinchi. Davom etayotganlari tugagach chiqadi.",
+    "{n} products": "{n} ta mahsulot", "{n} items held in unpaid orders": "to‘lanmagan buyurtmalarda {n} ta mahsulot band", "{n} out of stock": "{n} tasi tugagan",
+    "Stock held until decided": "Qaror qilinguncha band", "Open checkout": "To‘lov sahifasi", "All orders": "Barcha buyurtmalar", "Newest first": "Eng yangisi birinchi", "Orders by status": "Holati bo‘yicha buyurtmalar",
+    "<strong>Nothing on hold.</strong> When Aida places an order, its items are held here for 15 minutes while the customer pays.": "<strong>To‘lov kutayotgan buyurtma yo‘q.</strong> Aida buyurtma berganda, mijoz to‘lagunicha mahsulotlar 15 daqiqa band turadi.",
+    "<strong>Nobody is waiting for a person.</strong> Orders a customer was handed over on stay here, stock held, until someone decides.": "<strong>Odam kutayotgan hech kim yo‘q.</strong> Mijoz odamga o‘tkazilgan buyurtmalar kimdir qaror qilguncha mahsulotlari band holda shu yerda turadi.",
+    "<strong>No paid orders yet.</strong> Paying through a payment link moves an order here.": "<strong>Hali to‘langan buyurtma yo‘q.</strong> To‘lov havolasi orqali to‘langan buyurtma shu yerga o‘tadi.",
+    "<strong>No expired orders.</strong> Orders not paid within 15 minutes land here and their stock goes back on the shelf.": "<strong>Muddati o‘tgan buyurtma yo‘q.</strong> 15 daqiqada to‘lanmagan buyurtmalar shu yerga tushadi, mahsulotlari omborga qaytadi.",
+    "<strong>No orders yet.</strong> Message the bot on Telegram or call the store line, and Aida's orders appear here as she places them.": "<strong>Hali buyurtma yo‘q.</strong> Telegram botga yozing yoki do‘konga qo‘ng‘iroq qiling, Aida bergan buyurtmalar shu yerda chiqadi.",
+    "{e} Start it with {c}.": "{e} Uni ishga tushiring: {c}.",
+    "Other recent orders": "Boshqa so‘nggi buyurtmalar", "{n} of {k} shown": "{k} tadan {n} tasi ko‘rsatilgan", "{n} orders in all": "Jami {n} ta buyurtma",
+    "Stock is held {n} minutes for payment": "To‘lov uchun mahsulot {n} daqiqa band turadi", "View all orders": "Barcha buyurtmalar",
+    "{t}: {a} on shelf, {b} held, {c} sold": "{t}: omborda {a}, band {b}, sotilgan {c}", "On shelf": "Omborda", "Held": "Band", "Sold": "Sotilgan",
+    "{n} items held now": "Hozir {n} ta mahsulot band", "Prices and details": "Narxlar va tafsilotlar",
+    "No messages yet": "Hali xabar yo‘q", "{n} chats with a person": "{n} ta chat odam bilan", "{n} conversations": "{n} ta suhbat", "View all chats": "Barcha chatlar",
+    "Unlinked caller": "Noma’lum qo‘ng‘iroqchi", "Not summarised": "Xulosa yo‘q", "No summary: the transcript is all there is.": "Xulosa yo‘q: faqat suhbat matni bor.",
+    "<strong>No calls yet.</strong> Each call to the store line shows up here when it ends, with the AI's summary and the transcript.": "<strong>Hali qo‘ng‘iroq yo‘q.</strong> Har bir qo‘ng‘iroq tugagach shu yerda AI xulosasi va suhbat matni bilan chiqadi.",
+    "Store phone line": "Do‘kon telefoni", "{n} finished calls": "{n} ta tugagan qo‘ng‘iroq", "View all calls": "Barcha qo‘ng‘iroqlar",
+    "Order": "Buyurtma", "Order #{id} isn't among the newest {n}.": "#{id} buyurtma eng yangi {n} ta ichida yo‘q.",
+    "Choose an order to see its items, payment links and payments.": "Mahsulotlari, to‘lov havolalari va to‘lovlarini ko‘rish uchun buyurtmani tanlang.",
+    "Back on shelf": "Omborga qaytdi", "Payment links": "To‘lov havolalari", "Provider": "Tizim", "Link": "Havola", "Amount": "Summa", "State": "Holat", "Unpaid": "To‘lanmagan",
+    "No payment link yet. Aida makes one right after placing the order.": "Hali to‘lov havolasi yo‘q. Aida uni buyurtma bergan zahoti yaratadi.",
+    "Gateway payments": "To‘lov tizimidagi to‘lovlar", "Gateway": "Tizim", "Their id": "Ularning ID", "Started": "Boshlangan", "Cancelled": "Bekor qilingan",
+    "Order #{id}": "Buyurtma #{id}", "Customer": "Mijoz", "Deliver to": "Yetkazish manzili", "Placed": "Berilgan vaqti", "Total": "Jami",
+    "Items": "Mahsulotlar", "Product": "Mahsulot", "Qty": "Soni", "Price": "Narx", "Line": "Summa", "Stock": "Ombor",
+    "Conversations": "Suhbatlar", "Conversation": "Suhbat", "All chats": "Barcha chatlar", "Loading the conversation…": "Suhbat yuklanmoqda…", "Choose a conversation to read it.": "O‘qish uchun suhbatni tanlang.",
+    "A person took over {t}. Aida is quiet in this chat until someone replies /resume.": "{t} odam o‘z qo‘liga oldi. Kimdir /resume deb yozmaguncha Aida bu chatda jim turadi.",
+    "Aida is writing an answer.": "Aida javob yozmoqda.", "Aida is handling this chat.": "Bu chatni Aida olib boryapti.",
+    "Now": "Hozir", "Last active": "Oxirgi faollik", "AI": "AI", "Didn't answer {n} times in a row": "Ketma-ket {n} marta javob bermadi", "Waiting": "Kutmoqda", "{n} messages not answered yet": "{n} ta xabarga hali javob berilmagan",
+    "Nothing said yet.": "Hali hech narsa aytilmagan.", "Store note": "Do‘kon izohi",
+    "Finished calls": "Tugagan qo‘ng‘iroqlar", "Call": "Qo‘ng‘iroq", "Loading the call…": "Qo‘ng‘iroq yuklanmoqda…", "Choose a call to read its summary and transcript.": "Xulosa va suhbat matnini o‘qish uchun qo‘ng‘iroqni tanlang.",
+    "Caller": "Mijoz", "Outcome": "Natija", "Not summarised yet": "Hali xulosa yo‘q", "Wanted": "Nima istadi", "Items discussed": "Gaplashilgan mahsulotlar", "Length": "Davomiyligi", "Ended": "Tugagan vaqti",
+    "Admin": "Admin", "Sent the summary": "Xulosa yuborildi", "Not told yet": "Hali aytilmagan", "Call id": "Qo‘ng‘iroq ID", "Transcript": "Suhbat matni", "Nobody said anything.": "Hech kim hech narsa demadi.",
+    "Stock by product": "Mahsulotlar bo‘yicha ombor", "Counted per product, not per size or colour": "Mahsulot bo‘yicha sanaladi, o‘lcham yoki rang bo‘yicha emas", "Shelf value": "Ombor qiymati",
+    "Held items left the shelf when the order was placed. They come back if it isn't paid within {n} minutes.": "Band mahsulotlar buyurtma berilganda ombordan chiqqan. {n} daqiqada to‘lanmasa, qaytib keladi.",
+    "a moment": "bir lahza", "{t} left to pay": "To‘lash uchun {t} qoldi", "Time's up, releasing stock": "Vaqt tugadi, mahsulot bo‘shatilmoqda", "Releasing stock": "Mahsulot bo‘shatilmoqda",
+    "This store needs its API key": "Bu do‘kon API kalitini so‘raydi",
+    "The backend has {k} set. Enter it to see orders, chats and calls. It's kept in this tab only.": "Serverda {k} o‘rnatilgan. Buyurtma, chat va qo‘ng‘iroqlarni ko‘rish uchun uni kiriting. U faqat shu oynada saqlanadi.",
+    "That key was refused.": "Bu kalit qabul qilinmadi.", "Open the console": "Konsolni ochish",
+    "Nobody has written to the bot yet.": "Hali hech kim botga yozmagan.", "The chat hasn't run yet, so there are no conversations.": "Chat hali ishga tushmagan, shuning uchun suhbatlar yo‘q.",
+    "soum": "so‘m",
+  },
+  ru: {
+    "Overview": "Обзор", "Orders": "Заказы", "Chats": "Чаты", "Calls": "Звонки", "Shelf": "Склад",
+    "Setup": "Настройки", "API docs": "Документация API", "Store console": "Консоль магазина", "Menu": "Меню", "Language": "Язык",
+    "Today {t}": "Сегодня {t}", "Yesterday {t}": "Вчера {t}", "Just now": "Только что", "{n} min ago": "{n} мин назад", "{n} h ago": "{n} ч назад",
+    "On hold": "Ждут оплаты", "Needs a person": "Нужен человек", "Paid": "Оплачен", "Expired": "Просрочены", "Expired unpaid": "Не оплачен вовремя",
+    "Order placed": "Заказ оформлен", "Escalated": "Передан человеку", "Inquiry only": "Только вопрос",
+    "With a person": "С человеком", "Answering": "Отвечает",
+    "The store answered {s}.": "Магазин ответил кодом {s}.", "Can't reach the store backend.": "Нет связи с сервером магазина.",
+    "Store": "Магазин", "Connecting": "Подключение", "Telegram": "Telegram", "Live": "Работает", "Dry run": "Тестовый режим",
+    "Admin messages are sent.": "Сообщения администратору отправляются.",
+    "Admin messages are only logged: set TELEGRAM_BOT_TOKEN and ADMIN_CHAT_ID.": "Сообщения администратору только пишутся в лог: укажите TELEGRAM_BOT_TOKEN и ADMIN_CHAT_ID.",
+    "Payments": "Оплата", "Demo checkout": "Демо-оплата", "Payments are confirmed by the gateways.": "Оплату подтверждают платёжные системы.",
+    "Payment links open the demo checkout, which marks orders paid.": "Ссылки на оплату открывают демо-страницу, которая отмечает заказ оплаченным.",
+    "Summaries": "Итоги", "Off": "Выкл.", "{ai} summarises finished calls.": "{ai} пишет итоги завершённых звонков.",
+    "Set {key} to summarise calls.": "Укажите {key}, чтобы получать итоги звонков.",
+    "API key": "Ключ API", "Required": "Нужен", "Not set": "Не задан", "The API asks for X-API-Key.": "API требует X-API-Key.",
+    "Anyone who can reach this server can use the API.": "Любой, кто достучится до сервера, может пользоваться API.",
+    "{e} Last updated {t}.": "{e} Обновлено в {t}.", "Paused · updated {t}": "На паузе · обновлено {t}", "Live · updated {t}": "В реальном времени · обновлено {t}", "Retry": "Повторить",
+    "{n} orders need a person": ["{n} заказ ждёт человека", "{n} заказа ждут человека", "{n} заказов ждут человека"],
+    "{n} chats are with a person": ["{n} чат у человека", "{n} чата у человека", "{n} чатов у человека"],
+    "{n} orders on hold for {m}": ["{n} заказ на {m} ждёт оплаты", "{n} заказа на {m} ждут оплаты", "{n} заказов на {m} ждут оплаты"],
+    ", the next hold ends in {t}": ", ближайшая бронь истекает через {t}",
+    "No orders yet. They appear here the moment Aida places one.": "Заказов пока нет. Они появятся здесь, как только Aida оформит заказ.",
+    "Nothing on hold. {n} orders paid for {m} so far.": ["Ничего не ждёт оплаты. Пока оплачен {n} заказ на {m}.", "Ничего не ждёт оплаты. Пока оплачено {n} заказа на {m}.", "Ничего не ждёт оплаты. Пока оплачено {n} заказов на {m}."],
+    "Pay order #{id} (demo)": "Оплатить заказ #{id} (демо)",
+    "{n} orders · the newest {k} are shown": ["{n} заказ · показаны новые {k}", "{n} заказа · показаны новые {k}", "{n} заказов · показаны новые {k}"],
+    "{n} orders since the store opened": ["{n} заказ с открытия магазина", "{n} заказа с открытия магазина", "{n} заказов с открытия магазина"],
+    "{n} conversations on Telegram, most recent first": ["{n} диалог в Telegram, новые сверху", "{n} диалога в Telegram, новые сверху", "{n} диалогов в Telegram, новые сверху"],
+    "{n} finished calls, newest first. Calls in progress appear once they end.": ["{n} завершённый звонок, новые сверху. Текущие появятся после окончания.", "{n} завершённых звонка, новые сверху. Текущие появятся после окончания.", "{n} завершённых звонков, новые сверху. Текущие появятся после окончания."],
+    "{n} products": ["{n} товар", "{n} товара", "{n} товаров"], "{n} items held in unpaid orders": ["{n} шт. в брони неоплаченных заказов", "{n} шт. в брони неоплаченных заказов", "{n} шт. в брони неоплаченных заказов"], "{n} out of stock": "закончилось: {n}",
+    "Stock held until decided": "Товар в брони до решения", "Open checkout": "Страница оплаты", "All orders": "Все заказы", "Newest first": "Новые сверху", "Orders by status": "Заказы по статусу",
+    "<strong>Nothing on hold.</strong> When Aida places an order, its items are held here for 15 minutes while the customer pays.": "<strong>Ничего не ждёт оплаты.</strong> Когда Aida оформляет заказ, товары бронируются на 15 минут, пока клиент платит.",
+    "<strong>Nobody is waiting for a person.</strong> Orders a customer was handed over on stay here, stock held, until someone decides.": "<strong>Никто не ждёт человека.</strong> Заказы клиентов, переданных человеку, остаются здесь с бронью, пока кто-то не решит.",
+    "<strong>No paid orders yet.</strong> Paying through a payment link moves an order here.": "<strong>Оплаченных заказов пока нет.</strong> Оплата по ссылке переносит заказ сюда.",
+    "<strong>No expired orders.</strong> Orders not paid within 15 minutes land here and their stock goes back on the shelf.": "<strong>Просроченных заказов нет.</strong> Заказы, не оплаченные за 15 минут, попадают сюда, а товар возвращается на склад.",
+    "<strong>No orders yet.</strong> Message the bot on Telegram or call the store line, and Aida's orders appear here as she places them.": "<strong>Заказов пока нет.</strong> Напишите боту в Telegram или позвоните в магазин, и заказы Aida появятся здесь.",
+    "{e} Start it with {c}.": "{e} Запустите: {c}.",
+    "Other recent orders": "Другие недавние заказы", "{n} of {k} shown": "показано {n} из {k}", "{n} orders in all": ["всего {n} заказ", "всего {n} заказа", "всего {n} заказов"],
+    "Stock is held {n} minutes for payment": "Товар бронируется на {n} мин для оплаты", "View all orders": "Все заказы",
+    "{t}: {a} on shelf, {b} held, {c} sold": "{t}: на складе {a}, в брони {b}, продано {c}", "On shelf": "На складе", "Held": "В брони", "Sold": "Продано",
+    "{n} items held now": "Сейчас в брони: {n} шт.", "Prices and details": "Цены и подробности",
+    "No messages yet": "Сообщений пока нет", "{n} chats with a person": ["{n} чат у человека", "{n} чата у человека", "{n} чатов у человека"],
+    "{n} conversations": ["{n} диалог", "{n} диалога", "{n} диалогов"], "View all chats": "Все чаты",
+    "Unlinked caller": "Неизвестный абонент", "Not summarised": "Без итога", "No summary: the transcript is all there is.": "Итога нет: есть только расшифровка.",
+    "<strong>No calls yet.</strong> Each call to the store line shows up here when it ends, with the AI's summary and the transcript.": "<strong>Звонков пока нет.</strong> Каждый звонок появится здесь после окончания, с итогом от AI и расшифровкой.",
+    "Store phone line": "Телефон магазина", "{n} finished calls": ["{n} завершённый звонок", "{n} завершённых звонка", "{n} завершённых звонков"], "View all calls": "Все звонки",
+    "Order": "Заказ", "Order #{id} isn't among the newest {n}.": "Заказа #{id} нет среди последних {n}.",
+    "Choose an order to see its items, payment links and payments.": "Выберите заказ, чтобы увидеть товары, ссылки на оплату и платежи.",
+    "Back on shelf": "Вернулся на склад", "Payment links": "Ссылки на оплату", "Provider": "Система", "Link": "Ссылка", "Amount": "Сумма", "State": "Статус", "Unpaid": "Не оплачен",
+    "No payment link yet. Aida makes one right after placing the order.": "Ссылки на оплату пока нет. Aida создаёт её сразу после оформления заказа.",
+    "Gateway payments": "Платежи в платёжной системе", "Gateway": "Система", "Their id": "Их ID", "Started": "Начат", "Cancelled": "Отменён",
+    "Order #{id}": "Заказ #{id}", "Customer": "Клиент", "Deliver to": "Адрес доставки", "Placed": "Оформлен", "Total": "Итого",
+    "Items": "Товары", "Product": "Товар", "Qty": "Кол-во", "Price": "Цена", "Line": "Сумма", "Stock": "Склад",
+    "Conversations": "Диалоги", "Conversation": "Диалог", "All chats": "Все чаты", "Loading the conversation…": "Загрузка диалога…", "Choose a conversation to read it.": "Выберите диалог, чтобы прочитать его.",
+    "A person took over {t}. Aida is quiet in this chat until someone replies /resume.": "Человек подключился: {t}. Aida молчит в этом чате, пока кто-то не напишет /resume.",
+    "Aida is writing an answer.": "Aida пишет ответ.", "Aida is handling this chat.": "Этот чат ведёт Aida.",
+    "Now": "Сейчас", "Last active": "Последняя активность", "AI": "AI", "Didn't answer {n} times in a row": ["Не ответил {n} раз подряд", "Не ответил {n} раза подряд", "Не ответил {n} раз подряд"],
+    "Waiting": "Ожидает", "{n} messages not answered yet": ["{n} сообщение без ответа", "{n} сообщения без ответа", "{n} сообщений без ответа"],
+    "Nothing said yet.": "Пока ничего не сказано.", "Store note": "Заметка магазина",
+    "Finished calls": "Завершённые звонки", "Call": "Звонок", "Loading the call…": "Загрузка звонка…", "Choose a call to read its summary and transcript.": "Выберите звонок, чтобы прочитать итог и расшифровку.",
+    "Caller": "Клиент", "Outcome": "Результат", "Not summarised yet": "Итога пока нет", "Wanted": "Что хотел", "Items discussed": "Обсуждали товары", "Length": "Длительность", "Ended": "Завершён",
+    "Admin": "Администратор", "Sent the summary": "Итог отправлен", "Not told yet": "Пока не сообщено", "Call id": "ID звонка", "Transcript": "Расшифровка", "Nobody said anything.": "Никто ничего не сказал.",
+    "Stock by product": "Склад по товарам", "Counted per product, not per size or colour": "Считается по товару, а не по размеру или цвету", "Shelf value": "Стоимость на складе",
+    "Held items left the shelf when the order was placed. They come back if it isn't paid within {n} minutes.": "Товар в брони списан со склада при оформлении заказа. Он вернётся, если заказ не оплатят за {n} мин.",
+    "a moment": "мгновение", "{t} left to pay": "На оплату осталось {t}", "Time's up, releasing stock": "Время вышло, бронь снимается", "Releasing stock": "Бронь снимается",
+    "This store needs its API key": "Магазину нужен ключ API",
+    "The backend has {k} set. Enter it to see orders, chats and calls. It's kept in this tab only.": "На сервере задан {k}. Введите его, чтобы видеть заказы, чаты и звонки. Он хранится только в этой вкладке.",
+    "That key was refused.": "Ключ не принят.", "Open the console": "Открыть консоль",
+    "Nobody has written to the bot yet.": "Боту пока никто не писал.", "The chat hasn't run yet, so there are no conversations.": "Чат ещё не запускался, поэтому диалогов нет.",
+    "soum": "сум",
+  },
+};
+
+function pickForm(forms, n) {
+  if (!Array.isArray(forms)) return forms;
+  const m10 = n % 10, m100 = n % 100;
+  if (m10 === 1 && m100 !== 11) return forms[0];
+  if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return forms[1];
+  return forms[2];
+}
+const fill = (text, v) => v ? text.replace(/\{(\w+)\}/g, (_, k) => v[k] ?? "") : text;
+// One piece of English in the viewer's language.
+function t(english, v) {
+  const found = LANG === "en" ? null : DICT[LANG]?.[english];
+  return fill(found == null ? english : pickForm(found, v?.n ?? 0), v);
+}
+// A counted phrase: English has its own one/many wording; the others count in DICT.
+function tn(n, one, many, v = {}) {
+  const values = { ...v, n };
+  if (LANG === "en") return fill(n === 1 ? one : many, values);
+  return t(many, values);
+}
+
+const POLL_MS = 3000;
+const S = {
+  data: null, offset: 0, lastOk: null, error: null, needKey: false, loading: true,
+  view: "overview", id: null, tab: "pending", ordersTab: "all",
+  chat: null, call: null, detailError: null,
+  seen: null, fresh: new Set(), key: null,
+};
+try { S.key = sessionStorage.getItem("aida-api-key"); } catch (_) {}
+
+// ---------- formatting ----------
+const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+const money = (v) => usd.format(Number(v) || 0);
+const soum = (v) => `${new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Number(v) || 0)} ${t("soum")}`;
+const now = () => Date.now() + S.offset;
+const pad = (n) => String(n).padStart(2, "0");
+const hm = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+function when(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso), today = new Date(now());
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = Math.round((day(today) - day(d)) / 86400000);
+  if (diff === 0) return t("Today {t}", { t: hm(d) });
+  if (diff === 1) return t("Yesterday {t}", { t: hm(d) });
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm(d)}`;
+}
+function ago(iso) {
+  if (!iso) return "—";
+  const s = Math.max(0, (now() - Date.parse(iso)) / 1000);
+  if (s < 45) return t("Just now");
+  if (s < 3600) return t("{n} min ago", { n: Math.round(s / 60) });
+  if (s < 86400) return t("{n} h ago", { n: Math.round(s / 3600) });
+  return when(iso);
+}
+const clock = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return `${Math.floor(s / 60)}:${pad(s % 60)}`; };
+const duration = (s) => `${Math.floor(s / 60)}:${pad(s % 60)}`;
+const initials = (name) => (name || "?").replace(/^@/, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase() || "?";
+function tint(seed) {
+  let h = 0; for (const c of String(seed)) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `hsl(${(h % 12) * 30} 55% 88%)`;
+}
+
+const STATUS = {
+  pending: { tab: "On hold", pill: ["neutral", "On hold"] },
+  escalated: { tab: "Needs a person", pill: ["warning", "Needs a person"] },
+  paid: { tab: "Paid", pill: ["positive", "Paid"] },
+  cancelled_expired: { tab: "Expired", pill: ["neutral", "Expired unpaid"] },
+};
+const OUTCOME = { "Order Placed": ["positive", "Order placed"], "Escalated": ["warning", "Escalated"], "Inquiry Only": ["neutral", "Inquiry only"] };
+const CHAT_STATE = { with_person: ["warning", "With a person"], answering: ["neutral", "Answering"] };
+const pill = ([kind, label]) => `<span class="pill ${kind}">${esc(t(label))}</span>`;
+const ICON_TOOL = '<svg viewBox="0 0 14 14" aria-hidden="true"><path d="M2 7h8M7 4l3 3-3 3"/></svg>';
+
+// ---------- data ----------
+async function api(path) {
+  const r = await fetch(path, { headers: S.key ? { "X-API-Key": S.key } : {}, cache: "no-store" });
+  if (r.status === 401) { const e = new Error("key"); e.auth = true; throw e; }
+  if (!r.ok) {
+    let message = t("The store answered {s}.", { s: r.status });
+    try { message = (await r.json()).detail.message || message; } catch (_) {}
+    const e = new Error(message); e.status = r.status; throw e;
+  }
+  return r.json();
+}
+
+let timer = null;
+async function poll() {
+  clearTimeout(timer);
+  try {
+    const d = await api("/api/console");
+    S.offset = Date.parse(d.now) - Date.now();
+    noteArrivals(d);
+    S.data = d; S.lastOk = new Date(); S.error = null; S.needKey = false;
+    await refreshDetail();
+  } catch (e) {
+    if (e.auth) S.needKey = true;
+    else S.error = e.status ? e.message : t("Can't reach the store backend.");
+  }
+  S.loading = false;
+  render();
+  if (!S.needKey && !document.hidden) timer = setTimeout(poll, POLL_MS);
+}
+document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); else clearTimeout(timer); renderFresh(); });
+
+function noteArrivals(d) {
+  const ids = new Set([
+    ...d.orders.map((o) => `o${o.order_id}:${o.status}`),
+    ...d.calls.map((c) => `c${c.call_id}`),
+    ...d.chats.items.map((c) => `m${c.chat_id}:${c.messages}:${c.state}`),
+  ]);
+  S.fresh = new Set();
+  if (S.seen) for (const id of ids) if (!S.seen.has(id)) S.fresh.add(id.split(":")[0]);
+  S.seen = ids;
+}
+
+async function refreshDetail() {
+  S.detailError = null;
+  try {
+    if (S.view === "chats" && S.id) S.chat = await api(`/api/console/chats/${encodeURIComponent(S.id)}`);
+    if (S.view === "calls" && S.id && (!S.call || S.call.call_id !== S.id)) S.call = await api(`/api/console/calls/${encodeURIComponent(S.id)}`);
+  } catch (e) {
+    if (e.auth) throw e;
+    S.detailError = e.message;
+    if (S.view === "chats") S.chat = null; else S.call = null;
+  }
+}
+
+const loadDetail = () => refreshDetail().catch(() => { S.needKey = true; }).then(render);
+
+// ---------- routing ----------
+const TITLES = { overview: "Overview", orders: "Orders", chats: "Chats", calls: "Calls", shelf: "Shelf" };
+function route() {
+  const [, view = "overview", id = null] = location.hash.replace(/^#/, "").split("/");
+  const next = TITLES[view] ? view : "overview";
+  const changed = next !== S.view || (id && decodeURIComponent(id)) !== S.id;
+  S.view = next; S.id = id ? decodeURIComponent(id) : null;
+  if (changed) { S.chat = null; S.call = null; S.detailError = null; viewBuilt = null; }
+  document.getElementById("sidebar").classList.remove("open");
+  document.getElementById("menu").setAttribute("aria-expanded", "false");
+  if (changed && S.data) loadDetail();
+  render();
+  if (changed) window.scrollTo(0, 0);
+}
+window.addEventListener("hashchange", route);
+document.getElementById("menu").addEventListener("click", (e) => {
+  const open = document.getElementById("sidebar").classList.toggle("open");
+  e.currentTarget.setAttribute("aria-expanded", String(open));
+});
+
+// ---------- rendering ----------
+function patch(el, html) {
+  if (!el || el._html === html) return false;
+  el.innerHTML = html; el._html = html; return true;
+}
+const $ = (id) => document.getElementById(id);
+let viewBuilt = null;
+
+function render() {
+  const d = S.data;
+  document.querySelectorAll(".nav a").forEach((a) => {
+    if (a.dataset.view === S.view) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
+  translateStatic();
+  $("where").textContent = t(TITLES[S.view]);
+  document.title = `${t(TITLES[S.view])} · ${d ? d.store.name : t("Store console")}`;
+  if (d) $("store-name").textContent = d.store.name;
+  renderSetup();
+  if (S.needKey) { viewBuilt = "gate"; patch($("head"), ""); patch($("view"), gate()); bindGate(); return; }
+  renderHead();
+  if (viewBuilt !== S.view) {
+    viewBuilt = S.view;
+    const shells = {
+      overview: `<div class="grid row-1"><section class="card span-2" id="ov-orders" aria-labelledby="t-orders"></section><section class="card" id="ov-shelf" aria-labelledby="t-shelf"></section></div>
+                 <div class="grid row-2"><section class="card" id="ov-chats" aria-labelledby="t-chats"></section><section class="card" id="ov-calls" aria-labelledby="t-calls"></section></div>`,
+      orders: `<div class="panes" id="panes"><section class="card listing" id="v-list"></section><section class="card detail" id="v-detail"></section></div>`,
+      chats: `<div class="panes wide-detail" id="panes"><section class="card listing" id="v-list"></section><section class="card detail" id="v-detail"></section></div>`,
+      calls: `<div class="panes wide-detail" id="panes"><section class="card listing" id="v-list"></section><section class="card detail" id="v-detail"></section></div>`,
+      shelf: `<section class="card" id="v-shelf"></section>`,
+    };
+    $("view").innerHTML = shells[S.view]; $("view")._html = null;
+  }
+  ({ overview: renderOverview, orders: renderOrders, chats: renderChats, calls: renderCalls, shelf: renderShelfView })[S.view]();
+  tick();
+}
+
+function renderSetup() {
+  const d = S.data;
+  if (!d) { patch($("setup"), `<dt>${t("Store")}</dt><dd class="muted">${t("Connecting")}</dd>`); return; }
+  const s = d.store, ai = { openai: "OpenAI", gemini: "Gemini" }[s.ai] || "Claude";
+  const row = (label, state, text, title) => `<dt>${label}</dt><dd title="${esc(title)}"><span class="dot ${state}"></span>${esc(text)}</dd>`;
+  patch($("setup"), [
+    row("Telegram", s.telegram === "live" ? "on" : "warn", s.telegram === "live" ? t("Live") : t("Dry run"),
+      s.telegram === "live" ? t("Admin messages are sent.") : t("Admin messages are only logged: set TELEGRAM_BOT_TOKEN and ADMIN_CHAT_ID.")),
+    row(t("Payments"), s.payments === "real" ? "on" : "", s.payments === "real" ? s.gateways.map((g) => g === "click" ? "Click" : "Payme").join(", ") : t("Demo checkout"),
+      s.payments === "real" ? t("Payments are confirmed by the gateways.") : t("Payment links open the demo checkout, which marks orders paid.")),
+    row(t("Summaries"), s.summaries ? "on" : "", s.summaries ? ai : t("Off"), s.summaries ? t("{ai} summarises finished calls.", { ai }) : t("Set {key} to summarise calls.", { key: { openai: "OPENAI_API_KEY", gemini: "GEMINI_API_KEY" }[s.ai] || "ANTHROPIC_API_KEY" })),
+    row(t("API key"), s.api_key ? "on" : "warn", s.api_key ? t("Required") : t("Not set"), s.api_key ? t("The API asks for X-API-Key.") : t("Anyone who can reach this server can use the API.")),
+  ].join(""));
+}
+
+function renderFresh() {
+  const el = $("fresh"); if (!el) return;
+  let cls = "fresh", text;
+  const at = S.lastOk ? `${hm(S.lastOk)}:${pad(S.lastOk.getSeconds())}` : "";
+  if (S.error) { cls += " failed"; text = S.lastOk ? t("{e} Last updated {t}.", { e: S.error, t: hm(S.lastOk) }) : S.error; }
+  else if (!S.lastOk) text = t("Connecting");
+  else if (document.hidden) { cls += " paused"; text = t("Paused · updated {t}", { t: at }); }
+  else text = t("Live · updated {t}", { t: at });
+  el.className = cls;
+  el.innerHTML = `<span class="live" aria-hidden="true"></span><span>${esc(text)}</span>${S.error ? ` <button class="btn text" type="button" data-retry>${t("Retry")}</button>` : ""}`;
+}
+
+function soonestHeld(withTimeLeft) {
+  const held = (S.data?.orders || []).filter((o) => o.status === "pending" && o.reserved_until && (!withTimeLeft || Date.parse(o.reserved_until) > now()));
+  held.sort((a, b) => Date.parse(a.reserved_until) - Date.parse(b.reserved_until));
+  return held[0] || null;
+}
+const unpaidInvoice = (o) => o.invoices.find((i) => i.status === "unpaid");
+
+function finding() {
+  const d = S.data; if (!d) return `<span class="skeleton" style="width:320px"></span>`;
+  const c = d.counts, people = d.chats.items.filter((x) => x.state === "with_person").length;
+  const parts = [];
+  if (c.escalated.count) parts.push(`<strong>${esc(tn(c.escalated.count, "{n} order needs a person", "{n} orders need a person"))}</strong>`);
+  if (people) parts.push(`<strong>${esc(tn(people, "{n} chat is with a person", "{n} chats are with a person"))}</strong>`);
+  if (c.pending.count) {
+    const first = soonestHeld();
+    parts.push(esc(tn(c.pending.count, "{n} order on hold for {m}", "{n} orders on hold for {m}", { m: money(c.pending.total) })) +
+      (first ? t(", the next hold ends in {t}", { t: `<span data-until="${esc(first.reserved_until)}" data-fmt="in"></span>` }) : ""));
+  }
+  if (!parts.length) {
+    if (!d.orders_total) return t("No orders yet. They appear here the moment Aida places one.");
+    return esc(tn(c.paid.count, "Nothing on hold. {n} order paid for {m} so far.", "Nothing on hold. {n} orders paid for {m} so far.", { m: money(c.paid.total) }));
+  }
+  return parts.join(" · ");
+}
+
+function renderHead() {
+  const d = S.data;
+  let title = t(TITLES[S.view]), sub = "", action = "";
+  if (S.view === "overview") {
+    sub = finding();
+    const first = soonestHeld(true), inv = first && unpaidInvoice(first);
+    if (d && d.store.payments === "demo" && inv) action = `<a class="btn primary" href="/pay/${esc(inv.invoice_id)}" target="_blank" rel="noopener">${t("Pay order #{id} (demo)", { id: first.order_id })}</a>`;
+  } else if (!d) sub = `<span class="skeleton" style="width:240px"></span>`;
+  else if (S.view === "orders") sub = d.orders_total > d.orders.length ? tn(d.orders_total, "{n} order · the newest {k} are shown", "{n} orders · the newest {k} are shown", { k: d.orders.length }) : tn(d.orders_total, "{n} order since the store opened", "{n} orders since the store opened");
+  else if (S.view === "chats") sub = d.chats.available ? tn(d.chats.items.length, "{n} conversation on Telegram, most recent first", "{n} conversations on Telegram, most recent first") : esc(t(d.chats.note));
+  else if (S.view === "calls") sub = tn(d.calls.length, "{n} finished call, newest first. Calls in progress appear once they end.", "{n} finished calls, newest first. Calls in progress appear once they end.");
+  else if (S.view === "shelf") {
+    const held = d.shelf.reduce((n, p) => n + p.held, 0), out = d.shelf.filter((p) => p.on_shelf === 0).length;
+    sub = `${tn(d.shelf.length, "{n} product", "{n} products")} · ${tn(held, "{n} item held in unpaid orders", "{n} items held in unpaid orders")}` + (out ? ` · ${t("{n} out of stock", { n: out })}` : "");
+  }
+  patch($("head"), `<div><h1>${esc(title)}</h1><p id="finding">${sub}</p></div><div class="head-side"><div class="fresh" id="fresh"></div>${action}</div>`);
+  renderFresh();
+}
+
+// ----- orders -----
+function holdCell(o) {
+  if (o.status === "pending" && o.reserved_until) {
+    return `<div class="hold" data-hold="${esc(o.reserved_until)}" data-created="${esc(o.created_at)}"><span class="t" data-until="${esc(o.reserved_until)}" data-fmt="left"></span><span class="track"><i></i></span></div>`;
+  }
+  if (o.status === "escalated") return `<div class="hold"><span>${pill(STATUS.escalated.pill)}</span><span class="t muted">${t("Stock held until decided")}</span></div>`;
+  return `<div>${pill(STATUS[o.status].pill)}</div>`;
+}
+const itemsLine = (o) => o.items.map((i) => `${i.quantity} × ${i.title}${i.variant ? ` (${i.variant})` : ""}`).join(", ");
+
+function orderRow(o, href, current) {
+  const inv = unpaidInvoice(o);
+  const act = S.data.store.payments === "demo" && inv && (o.status === "pending" || o.status === "escalated")
+    ? `<a class="btn ghost" href="/pay/${esc(inv.invoice_id)}" target="_blank" rel="noopener" data-stop>${t("Open checkout")}</a>` : "";
+  const username = o.customer_telegram_username ? ` · @${esc(o.customer_telegram_username)}` : "";
+  return `<li class="order${S.fresh.has("o" + o.order_id) ? " new" : ""}" data-href="${href}"${current ? ' aria-current="true"' : ""}>
+    <div class="who"><div class="line1"><span class="id">#${o.order_id}</span><a class="name" href="${href}">${esc(o.customer_name)}</a></div>
+      <div class="line2">${esc(itemsLine(o))}${username}</div></div>
+    <div class="hold-cell">${holdCell(o)}</div>
+    <div class="total"><span class="money">${money(o.total_amount)}</span></div>
+    <div class="act">${act}</div></li>`;
+}
+
+function tabs(selected, attr, withAll) {
+  const c = S.data.counts;
+  const cell = (key, label, count, sub) => `<button class="tab" type="button" role="tab" ${attr}="${key}" aria-selected="${selected === key}">
+    <span class="label">${esc(t(label))}</span><span class="value${count ? "" : " zero"}">${count}</span><span class="sub">${sub}</span></button>`;
+  const cells = ["pending", "escalated", "paid", "cancelled_expired"].map((k) => cell(k, STATUS[k].tab, c[k].count, money(c[k].total)));
+  if (withAll) cells.unshift(cell("all", "All orders", S.data.orders_total, t("Newest first")));
+  return `<div class="tabs${withAll ? " five" : ""}" role="tablist" aria-label="${t("Orders by status")}">${cells.join("")}</div>`;
+}
+
+const EMPTY_ORDERS = {
+  pending: "<strong>Nothing on hold.</strong> When Aida places an order, its items are held here for 15 minutes while the customer pays.",
+  escalated: "<strong>Nobody is waiting for a person.</strong> Orders a customer was handed over on stay here, stock held, until someone decides.",
+  paid: "<strong>No paid orders yet.</strong> Paying through a payment link moves an order here.",
+  cancelled_expired: "<strong>No expired orders.</strong> Orders not paid within 15 minutes land here and their stock goes back on the shelf.",
+  all: "<strong>No orders yet.</strong> Message the bot on Telegram or call the store line, and Aida's orders appear here as she places them.",
+};
+
+function renderOverview() {
+  const d = S.data;
+  if (!d) {
+    const sk = (h, n) => `<div class="card-head"><h2>${t(h)}</h2></div>` + Array.from({ length: n }, () => `<div class="item" style="padding:16px 20px"><span class="skeleton" style="width:60%"></span></div>`).join("");
+    patch($("ov-orders"), sk("Orders", 5)); patch($("ov-shelf"), sk("Shelf", 5)); patch($("ov-chats"), sk("Chats", 3)); patch($("ov-calls"), sk("Calls", 3));
+    if (S.error) patch($("ov-orders"), `<div class="card-head"><h2 id="t-orders">${t("Orders")}</h2></div><p class="problem">${t("{e} Start it with {c}.", { e: esc(S.error), c: '<span class="mono">uv run uvicorn app.main:app --port 8000</span>' })}</p>`);
+    return;
+  }
+  const rows = d.orders.filter((o) => o.status === S.tab);
+  const shown = rows.slice(0, 6);
+  // A short tab is topped up to three rows with the newest other orders, so the card has no hole.
+  const others = shown.length < 3 ? d.orders.filter((o) => o.status !== S.tab).slice(0, 3 - shown.length) : [];
+  const list = shown.length ? `<ul class="orders">${shown.map((o) => orderRow(o, `#/orders/${o.order_id}`)).join("")}</ul>`
+    : d.orders_total ? `<p class="quiet">${t(EMPTY_ORDERS[S.tab])}</p>` : `<p class="empty-state" style="margin-top:16px">${t(EMPTY_ORDERS.all)}</p>`;
+  const more = others.length ? `<p class="subhead">${t("Other recent orders")}</p><ul class="orders">${others.map((o) => orderRow(o, `#/orders/${o.order_id}`)).join("")}</ul>` : "";
+  const foot = rows.length > shown.length ? t("{n} of {k} shown", { n: shown.length, k: rows.length }) : tn(d.orders_total, "{n} order in all", "{n} orders in all");
+  patch($("ov-orders"), `<div class="card-head"><h2 id="t-orders">${t("Orders")}</h2><span class="aside">${t("Stock is held {n} minutes for payment", { n: d.store.hold_minutes })}</span></div>
+    ${tabs(S.tab, "data-tab", false)}
+    ${list}${more}
+    <div class="card-foot"><span>${foot}</span><a href="#/orders">${t("View all orders")}</a></div>`);
+  patch($("ov-shelf"), shelfCard(true));
+  patch($("ov-chats"), chatsCard());
+  patch($("ov-calls"), callsCard());
+}
+
+function shelfCard(compact) {
+  const d = S.data;
+  const max = Math.max(1, ...d.shelf.map((p) => p.on_shelf + p.held + p.sold));
+  const items = d.shelf.map((p) => {
+    const w = (n) => `${(n / max) * 100}%`;
+    const said = t("{t}: {a} on shelf, {b} held, {c} sold", { t: p.title, a: p.on_shelf, b: p.held, c: p.sold });
+    return `<li class="item" title="${esc(said)}"><span class="title">${esc(p.title)}</span>
+      <span class="bar" role="img" aria-label="${esc(said)}">${p.on_shelf ? `<i class="shelf-part" style="width:${w(p.on_shelf)}"></i>` : ""}${p.held ? `<i class="held-part" style="width:${w(p.held)}"></i>` : ""}${p.sold ? `<i class="sold-part" style="width:${w(p.sold)}"></i>` : ""}<i class="empty"></i></span>
+      <span class="count${p.on_shelf ? "" : " out"}">${p.on_shelf}</span></li>`;
+  }).join("");
+  return `<div class="card-head"><h2 id="t-shelf">${t("Shelf")}</h2><div class="legend" aria-hidden="true"><span><i></i>${t("On shelf")}</span><span><i class="held"></i>${t("Held")}</span><span><i class="sold"></i>${t("Sold")}</span></div></div>
+    <ul class="shelf">${items}</ul>${compact ? `<div class="card-foot"><span>${tn(d.shelf.reduce((n, p) => n + p.held, 0), "{n} item held now", "{n} items held now")}</span><a href="#/shelf">${t("Prices and details")}</a></div>` : ""}`;
+}
+
+// ----- chats and calls -----
+const chatName = (c) => c.customer_name || (c.username ? `@${c.username}` : `Telegram ${c.chat_id}`);
+function chatEntry(c, current, tag = "a") {
+  const last = c.last_text ? `${c.last_from === "aida" ? "Aida: " : ""}${c.last_text.replace(/\s+/g, " ")}` : t("No messages yet");
+  const state = CHAT_STATE[c.state] ? pill(CHAT_STATE[c.state]) : "";
+  return `<${tag} class="entry${S.fresh.has("m" + c.chat_id) ? " new" : ""}" href="#/chats/${c.chat_id}"${current ? ' aria-current="true"' : ""}>
+    <span class="avatar" style="background:${tint(c.chat_id)}" aria-hidden="true">${esc(initials(chatName(c)))}</span>
+    <span class="who"><span class="line1"><span class="name">${esc(chatName(c))}</span></span><span class="line2">${esc(last)}</span></span>
+    <span class="end"><span>${esc(ago(c.active_at))}</span>${state}</span></${tag}>`;
+}
+// Chats and calls share a row, so they show the same number of rows: 3 or 4.
+const pairRows = () => Math.max(3, Math.min(4, S.data.chats.items.length, S.data.calls.length));
+function chatsCard() {
+  const ch = S.data.chats, n = pairRows();
+  const body = !ch.available ? `<p class="empty-state">${startIt(ch.note, "uv run python -m chat")}</p>`
+    : !ch.items.length ? `<p class="empty-state">${esc(t(ch.note))}</p>`
+    : `<ul class="list">${ch.items.slice(0, n).map((c) => `<li>${chatEntry(c)}</li>`).join("")}</ul>`;
+  const people = ch.items.filter((c) => c.state === "with_person").length;
+  return `<div class="card-head"><h2 id="t-chats">${t("Chats")}</h2><span class="aside">${people ? tn(people, "{n} chat with a person", "{n} chats with a person") : "Telegram"}</span></div>${body}
+    <div class="card-foot"><span>${ch.items.length > n ? t("{n} of {k} shown", { n, k: ch.items.length }) : tn(ch.items.length, "{n} conversation", "{n} conversations")}</span><a href="#/chats">${t("View all chats")}</a></div>`;
+}
+const callerName = (c) => c.caller_name || (c.caller_username ? `@${c.caller_username}` : c.caller_telegram_id ? `Telegram ${c.caller_telegram_id}` : t("Unlinked caller"));
+function callEntry(c, current) {
+  const state = c.outcome ? pill(OUTCOME[c.outcome] || ["neutral", c.outcome]) : pill(["neutral", "Not summarised"]);
+  return `<a class="entry${S.fresh.has("c" + c.call_id) ? " new" : ""}" href="#/calls/${encodeURIComponent(c.call_id)}"${current ? ' aria-current="true"' : ""}>
+    <span class="avatar" style="background:${tint(c.caller_telegram_id || c.call_id)}" aria-hidden="true">${esc(initials(callerName(c)))}</span>
+    <span class="who"><span class="line1"><span class="name">${esc(callerName(c))}</span></span><span class="line2">${esc(c.customer_intent || t("No summary: the transcript is all there is."))}</span></span>
+    <span class="end"><span>${esc(ago(c.created_at))} · ${duration(c.duration_seconds)}</span>${state}</span></a>`;
+}
+function callsCard() {
+  const calls = S.data.calls, n = pairRows();
+  const body = calls.length ? `<ul class="list">${calls.slice(0, n).map((c) => `<li>${callEntry(c)}</li>`).join("")}</ul>`
+    : `<p class="empty-state">${t(NO_CALLS)}</p>`;
+  return `<div class="card-head"><h2 id="t-calls">${t("Calls")}</h2><span class="aside">${t("Store phone line")}</span></div>${body}
+    <div class="card-foot"><span>${calls.length > n ? t("{n} of {k} shown", { n, k: calls.length }) : tn(calls.length, "{n} finished call", "{n} finished calls")}</span><a href="#/calls">${t("View all calls")}</a></div>`;
+}
+
+// ----- views with a detail pane -----
+const wide = () => matchMedia("(min-width: 861px)").matches;
+function setDetail(has) { $("panes")?.classList.toggle("has-detail", has); }
+const backLink = (href, label) => `<a class="btn text back" href="${href}">${t(label)}</a>`;
+const NO_CALLS = "<strong>No calls yet.</strong> Each call to the store line shows up here when it ends, with the AI's summary and the transcript.";
+const startIt = (note, command) => t("{e} Start it with {c}.", { e: esc(t(note)), c: `<span class="mono">${command}</span>` });
+
+function renderOrders() {
+  const d = S.data; if (!d) return;
+  const rows = S.ordersTab === "all" ? d.orders : d.orders.filter((o) => o.status === S.ordersTab);
+  let id = S.id ? Number(S.id) : null;
+  if (!id && wide() && rows.length) id = rows[0].order_id;
+  patch($("v-list"), `<div class="card-head"><h2>${t("All orders")}</h2></div>${tabs(S.ordersTab, "data-orders-tab", true)}
+    ${rows.length ? `<ul class="orders">${rows.map((o) => orderRow(o, `#/orders/${o.order_id}`, o.order_id === id)).join("")}</ul>` : `<p class="empty-state" style="margin-top:16px">${t(EMPTY_ORDERS[S.ordersTab])}</p>`}`);
+  const o = d.orders.find((x) => x.order_id === id);
+  setDetail(Boolean(S.id));
+  patch($("v-detail"), o ? orderDetail(o) : `<div class="card-head"><h2>${t("Order")}</h2>${backLink("#/orders", "All orders")}</div><p class="empty-state">${id ? t("Order #{id} isn't among the newest {n}.", { id: esc(id), n: d.orders.length }) : t("Choose an order to see its items, payment links and payments.")}</p>`);
+}
+
+function orderDetail(o) {
+  const items = o.items.map((i) => `<tr><td>${esc(i.title)}${i.variant ? `<span class="sub">${esc(i.variant)}</span>` : ""}</td><td class="num">${i.quantity}</td><td class="num">${money(i.unit_price)}</td><td class="num">${money(i.line_total)}</td><td class="muted">${t({ reserved: "Held", sold: "Sold", released: "Back on shelf" }[i.state])}</td></tr>`).join("");
+  const invoices = o.invoices.length ? `<div class="section-title">${t("Payment links")}</div><div class="table-wrap"><table><thead><tr><th>${t("Provider")}</th><th>${t("Link")}</th><th class="num">${t("Amount")}</th><th>${t("State")}</th></tr></thead><tbody>${o.invoices.map((i) => `<tr><td>${i.provider === "click" ? "Click" : "Payme"}</td><td><a class="mono" href="/pay/${esc(i.invoice_id)}" target="_blank" rel="noopener" title="${esc(i.payment_url)}">${esc(i.invoice_id.slice(0, 12))}…</a></td><td class="num">${money(i.amount)}</td><td>${i.status === "paid" ? pill(["positive", "Paid"]) : `<span class="muted">${t("Unpaid")}</span>`}</td></tr>`).join("")}</tbody></table></div>`
+    : `<div class="section-title">${t("Payment links")}</div><p class="empty-state">${t("No payment link yet. Aida makes one right after placing the order.")}</p>`;
+  const tx = o.transactions.length ? `<div class="section-title">${t("Gateway payments")}</div><div class="table-wrap"><table><thead><tr><th>${t("Gateway")}</th><th>${t("Their id")}</th><th class="num">${t("Amount")}</th><th>${t("State")}</th></tr></thead><tbody>${o.transactions.map((x) => `<tr><td>${x.provider === "click" ? "Click" : "Payme"}</td><td class="mono">${esc(x.external_id.slice(0, 10))}${x.external_id.length > 10 ? "…" : ""}</td><td class="num">${soum(x.amount_uzs)}</td><td>${t({ created: "Started", paid: "Paid", cancelled: "Cancelled" }[x.state])}</td></tr>`).join("")}</tbody></table></div>` : "";
+  const user = o.customer_telegram_username ? `<a href="https://t.me/${esc(o.customer_telegram_username)}" target="_blank" rel="noopener">@${esc(o.customer_telegram_username)}</a> · ` : "";
+  return `<div class="card-head"><h2>${t("Order #{id}", { id: o.order_id })}</h2>${backLink("#/orders", "All orders")}</div>
+    <div style="padding:0 var(--card-pad) 16px">${holdCell(o)}</div>
+    <dl class="facts"><dt>${t("Customer")}</dt><dd>${esc(o.customer_name)}</dd><dt>Telegram</dt><dd>${user}<span class="mono">${esc(o.customer_telegram_id)}</span></dd>
+      <dt>${t("Deliver to")}</dt><dd>${esc(o.delivery_address)}</dd><dt>${t("Placed")}</dt><dd>${esc(when(o.created_at))}</dd><dt>${t("Total")}</dt><dd class="money">${money(o.total_amount)}</dd></dl>
+    <div class="section-title">${t("Items")}</div><div class="table-wrap"><table><thead><tr><th>${t("Product")}</th><th class="num">${t("Qty")}</th><th class="num">${t("Price")}</th><th class="num">${t("Line")}</th><th>${t("Stock")}</th></tr></thead><tbody>${items}</tbody></table></div>
+    ${invoices}${tx}`;
+}
+
+function renderChats() {
+  const d = S.data; if (!d) return;
+  const ch = d.chats;
+  let id = S.id;
+  if (!id && wide() && ch.items.length) { id = String(ch.items[0].chat_id); S.id = id; loadDetail(); }
+  patch($("v-list"), `<div class="card-head"><h2>${t("Conversations")}</h2></div>${!ch.available ? `<p class="empty-state">${startIt(ch.note, "uv run python -m chat")}</p>`
+    : ch.items.length ? `<ul class="list">${ch.items.map((c) => `<li>${chatEntry(c, String(c.chat_id) === id)}</li>`).join("")}</ul>` : `<p class="empty-state">${esc(t(ch.note))}</p>`}`);
+  setDetail(Boolean(S.id) && !location.hash.endsWith("/chats"));
+  const c = S.chat;
+  if (!c) { patch($("v-detail"), `<div class="card-head"><h2>${t("Conversation")}</h2>${backLink("#/chats", "All chats")}</div>${S.detailError ? `<p class="problem">${esc(S.detailError)}</p>` : `<p class="empty-state">${id ? t("Loading the conversation…") : t("Choose a conversation to read it.")}</p>`}`); return; }
+  const lines = c.entries.map((e) => {
+    if (e.kind === "customer") return `<div class="say customer"><span class="from">${esc(chatName(c))}</span>${esc(e.text)}</div>`;
+    // Telegram HTML from the store's own formatter: escaped, with only the tags Telegram allows.
+    if (e.kind === "aida") return `<div class="say aida"><span class="from">Aida</span>${e.html ?? esc(e.text)}</div>`;
+    if (e.kind === "tool") return `<div class="tool${e.ok === false ? " failed" : ""}">${ICON_TOOL}<span>${esc(e.text)}</span></div>`;
+    return `<div class="note" data-label="${esc(t("Store note"))}"><span>${esc(e.text)}</span></div>`;
+  }).join("");
+  const state = c.state === "with_person" ? t("A person took over {t}. Aida is quiet in this chat until someone replies /resume.", { t: esc(ago(c.paused_at)).toLowerCase() }) : c.state === "answering" ? t("Aida is writing an answer.") : t("Aida is handling this chat.");
+  const user = c.username ? `<a href="https://t.me/${esc(c.username)}" target="_blank" rel="noopener">@${esc(c.username)}</a> · ` : "";
+  const wasBottom = (() => { const el = $("v-detail"); return !el._html || el.scrollHeight - el.scrollTop - el.clientHeight < 40; })();
+  const changed = patch($("v-detail"), `<div class="card-head"><h2>${esc(chatName(c))}</h2>${backLink("#/chats", "All chats")}</div>
+    <dl class="facts"><dt>Telegram</dt><dd>${user}<span class="mono">${c.chat_id}</span></dd><dt>${t("Now")}</dt><dd>${state}</dd><dt>${t("Last active")}</dt><dd>${esc(when(c.active_at))}</dd>
+    ${c.failures ? `<dt>${t("AI")}</dt><dd>${tn(c.failures, "Didn't answer {n} time in a row", "Didn't answer {n} times in a row")}</dd>` : ""}${c.waiting ? `<dt>${t("Waiting")}</dt><dd>${tn(c.waiting, "{n} message not answered yet", "{n} messages not answered yet")}</dd>` : ""}</dl>
+    <div class="section-title">${t("Conversation")}</div><div class="convo">${lines || `<p class="muted">${t("Nothing said yet.")}</p>`}</div>`);
+  if (changed && wasBottom && wide()) { const el = $("v-detail"); el.scrollTop = el.scrollHeight; }
+}
+
+function renderCalls() {
+  const d = S.data; if (!d) return;
+  let id = S.id;
+  if (!id && wide() && d.calls.length) { id = d.calls[0].call_id; S.id = id; loadDetail(); }
+  patch($("v-list"), `<div class="card-head"><h2>${t("Finished calls")}</h2></div>${d.calls.length ? `<ul class="list">${d.calls.map((c) => `<li>${callEntry(c, c.call_id === id)}</li>`).join("")}</ul>`
+    : `<p class="empty-state">${t(NO_CALLS)}</p>`}`);
+  setDetail(Boolean(S.id) && !location.hash.endsWith("/calls"));
+  const c = S.call;
+  if (!c) { patch($("v-detail"), `<div class="card-head"><h2>${t("Call")}</h2>${backLink("#/calls", "All calls")}</div>${S.detailError ? `<p class="problem">${esc(S.detailError)}</p>` : `<p class="empty-state">${id ? t("Loading the call…") : t("Choose a call to read its summary and transcript.")}</p>`}`); return; }
+  const lines = c.transcript.split(/\n+/).filter((l) => l.trim()).map((l) => {
+    const m = l.match(/^\s*(Caller|Aida|Customer)\s*:\s*(.*)$/i);
+    const who = /^aida$/i.test(m?.[1] || "") ? "Aida" : t("Caller");
+    return m ? `<p class="line"><b>${esc(who)}:</b> ${esc(m[2])}</p>` : `<p class="line">${esc(l)}</p>`;
+  }).join("");
+  patch($("v-detail"), `<div class="card-head"><h2>${esc(callerName(c))}</h2>${backLink("#/calls", "All calls")}</div>
+    <dl class="facts"><dt>${t("Outcome")}</dt><dd>${c.outcome ? pill(OUTCOME[c.outcome] || ["neutral", c.outcome]) : `<span class="muted">${t("Not summarised yet")}</span>`}</dd>
+      <dt>${t("Wanted")}</dt><dd>${esc(c.customer_intent || "—")}</dd><dt>${t("Items discussed")}</dt><dd>${esc(c.items_discussed || "—")}</dd>
+      <dt>${t("Length")}</dt><dd class="num">${duration(c.duration_seconds)}</dd><dt>${t("Ended")}</dt><dd>${esc(when(c.created_at))}</dd>
+      <dt>${t("Admin")}</dt><dd>${c.reported ? t("Sent the summary") : `<span class="muted">${t("Not told yet")}</span>`}</dd><dt>${t("Call id")}</dt><dd class="mono">${esc(c.call_id)}</dd></dl>
+    <div class="section-title">${t("Transcript")}</div><div class="convo">${lines || `<p class="muted">${t("Nobody said anything.")}</p>`}</div>`);
+}
+
+function renderShelfView() {
+  const d = S.data;
+  if (!d) return;
+  const rows = d.shelf.map((p) => `<tr><td><b style="font-weight:500">${esc(p.title)}</b><span class="sub">${esc(p.category)}</span></td><td class="num">${money(p.price)}</td>
+    <td class="num">${p.on_shelf === 0 ? '<span style="color:var(--negative);font-weight:500">0</span>' : p.on_shelf}</td><td class="num">${p.held || '<span class="muted">0</span>'}</td><td class="num">${p.sold || '<span class="muted">0</span>'}</td>
+    <td class="num hide-phone">${money(p.price * (p.on_shelf))}</td></tr>`).join("");
+  const worth = d.shelf.reduce((n, p) => n + Math.round(p.price * p.on_shelf * 100), 0) / 100;
+  patch($("v-shelf"), `<div class="card-head"><h2>${t("Stock by product")}</h2><span class="aside">${t("Counted per product, not per size or colour")}</span></div>
+    <div class="table-wrap"><table><thead><tr><th>${t("Product")}</th><th class="num">${t("Price")}</th><th class="num">${t("On shelf")}</th><th class="num">${t("Held")}</th><th class="num">${t("Sold")}</th><th class="num hide-phone">${t("Shelf value")}</th></tr></thead>
+    <tbody>${rows}<tr><td><b style="font-weight:500">${t("Total")}</b></td><td></td><td class="num">${d.shelf.reduce((n, p) => n + p.on_shelf, 0)}</td><td class="num">${d.shelf.reduce((n, p) => n + p.held, 0)}</td><td class="num">${d.shelf.reduce((n, p) => n + p.sold, 0)}</td><td class="num hide-phone money">${money(worth)}</td></tr></tbody></table></div>
+    <div class="card-foot"><span>${t("Held items left the shelf when the order was placed. They come back if it isn't paid within {n} minutes.", { n: d.store.hold_minutes })}</span></div>`);
+}
+
+// ---------- the clocks ----------
+function tick() {
+  const at = now(), hold = (S.data?.store.hold_minutes || 15) * 60000, grace = (S.data?.store.expiry_check_seconds || 60) * 1000;
+  document.querySelectorAll("[data-until]").forEach((el) => {
+    const left = Date.parse(el.dataset.until) - at;
+    let text;
+    if (el.dataset.fmt === "in") text = left > 0 ? clock(left) : t("a moment");
+    else text = left > 0 ? t("{t} left to pay", { t: clock(left) }) : left > -grace ? t("Time's up, releasing stock") : t("Releasing stock");
+    if (el.textContent !== text) el.textContent = text;
+    el.classList.toggle("late", left < 3 * 60000);
+  });
+  document.querySelectorAll("[data-hold] .track i").forEach((bar) => {
+    const left = Date.parse(bar.closest("[data-hold]").dataset.hold) - at;
+    bar.style.width = `${Math.max(0, Math.min(1, left / hold)) * 100}%`;
+  });
+}
+setInterval(tick, 1000);
+
+// ---------- events ----------
+document.addEventListener("click", (e) => {
+  const tab = e.target.closest("[data-tab]");
+  if (tab) { S.tab = tab.dataset.tab; render(); return; }
+  const otab = e.target.closest("[data-orders-tab]");
+  if (otab) { S.ordersTab = otab.dataset.ordersTab; render(); return; }
+  if (e.target.closest("[data-retry]")) { poll(); return; }
+  const lang = e.target.closest("[data-lang]");
+  if (lang) { setLanguage(lang.dataset.lang); return; }
+  if (e.target.closest("a, button")) return;
+  const row = e.target.closest("[data-href]");
+  if (row) location.hash = row.dataset.href;
+});
+document.addEventListener("keydown", (e) => {
+  const tab = e.target.closest?.('[role="tab"]');
+  if (!tab || !["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+  const all = [...tab.parentElement.children], next = all[(all.indexOf(tab) + (e.key === "ArrowRight" ? 1 : all.length - 1)) % all.length];
+  next.click(); requestAnimationFrame(() => document.querySelector(`[role="tab"][${next.dataset.tab ? "data-tab" : "data-orders-tab"}="${next.dataset.tab || next.dataset.ordersTab}"]`)?.focus());
+});
+
+// ---------- API key ----------
+function gate() {
+  return `<section class="card gate" aria-labelledby="gate-title"><div class="card-head"><h2 id="gate-title">${t("This store needs its API key")}</h2></div>
+    <p>${t("The backend has {k} set. Enter it to see orders, chats and calls. It's kept in this tab only.", { k: '<span class="mono">AGENT_API_KEY</span>' })}</p>
+    <form id="gate-form"><label for="key">${t("API key")}</label><input id="key" name="key" type="password" autocomplete="off" required>
+    ${S.key ? `<p style="padding:0;color:var(--negative)">${t("That key was refused.")}</p>` : ""}<button class="btn primary" type="submit">${t("Open the console")}</button></form></section>`;
+}
+function bindGate() {
+  const form = $("gate-form"); if (!form || form._bound) return; form._bound = true;
+  form.addEventListener("submit", (e) => {
+    e.preventDefault(); S.key = form.key.value.trim();
+    try { sessionStorage.setItem("aida-api-key", S.key); } catch (_) {}
+    viewBuilt = null; S.needKey = false; poll();
+  });
+}
+
+// ---------- switching language ----------
+function translateStatic() {
+  document.documentElement.lang = LANG;
+  document.querySelectorAll("[data-t]").forEach((el) => { const text = t(el.dataset.t); if (el.textContent !== text) el.textContent = text; });
+  document.querySelectorAll("[data-t-label]").forEach((el) => el.setAttribute("aria-label", t(el.dataset.tLabel)));
+  document.querySelectorAll("[data-lang]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.lang === LANG)));
+}
+function setLanguage(lang) {
+  if (!LANG_NAMES[lang] || lang === LANG) return;
+  LANG = lang;
+  try { localStorage.setItem("aida-lang", lang); } catch (_) {}
+  viewBuilt = null;
+  for (const id of ["head", "setup", "fresh"]) { const el = $(id); if (el) el._html = null; }
+  render();
+}
+
+route();
+poll();
+</script>
+</body>
+</html>

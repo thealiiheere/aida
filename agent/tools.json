@@ -1,0 +1,297 @@
+{
+  "tools": [
+    {
+      "name": "search_catalog",
+      "description": "Search the store catalog. Returns each match's id, title, price, stock and description. Call this whenever the customer asks about products, and quote only the prices it returns. A blank query lists the catalog.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "What the customer is looking for, for example \"wireless earbuds\"."
+          },
+          "category": {
+            "type": "string",
+            "description": "Only return this category. Use a category name seen in an earlier result."
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "check_stock",
+      "description": "Get the current stock of one product. Stock is counted per product, not per size or color: if the result has a note about the variant, don't promise that variant is available.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "product_id": {
+            "type": "string",
+            "description": "The product's id from search_catalog."
+          },
+          "variant": {
+            "type": "string",
+            "description": "Size or color the customer asked for."
+          }
+        },
+        "required": [
+          "product_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "create_order",
+      "description": "Create a pending order and hold its stock for 15 minutes. Call this once, and only after the customer has explicitly confirmed the items, total and address. The returned total_amount is the only correct total. If it fails with insufficient_stock, nothing was ordered: tell the customer what is available.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "customer_telegram_id": {
+            "type": "string",
+            "description": "The caller's numeric Telegram id from the call or chat session, never a number the caller says."
+          },
+          "customer_telegram_username": {
+            "type": "string",
+            "description": "The caller's Telegram username from the session, if they have one."
+          },
+          "customer_name": {
+            "type": "string",
+            "description": "The customer's full name."
+          },
+          "delivery_address": {
+            "type": "string",
+            "description": "Full delivery address, as read back and confirmed."
+          },
+          "items": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 20,
+            "items": {
+              "type": "object",
+              "properties": {
+                "product_id": {
+                  "type": "string",
+                  "description": "The product's id from search_catalog."
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "variant": {
+                  "type": "string",
+                  "description": "Size or color, for example \"black, size M\"."
+                }
+              },
+              "required": [
+                "product_id",
+                "quantity"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "customer_telegram_id",
+          "customer_name",
+          "delivery_address",
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "generate_invoice",
+      "description": "Create a Click or Payme payment link for an order. Calling it again for the same order and provider returns the same link. Never read the link aloud. The link reached the customer's Telegram chat only if sent_to_customer is true in the result.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "The order_id from create_order."
+          },
+          "payment_provider": {
+            "type": "string",
+            "enum": [
+              "click",
+              "payme"
+            ]
+          }
+        },
+        "required": [
+          "order_id",
+          "payment_provider"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "get_order_status",
+      "description": "Check whether one of this customer's own orders has been paid. Call this whenever they say they have paid, and answer from the result, not from what they say. Status is pending, paid, escalated (a person is handling it) or cancelled_expired (not paid within 15 minutes, so its items are back on sale).",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "The order_id from create_order, or the order number the customer gives."
+          }
+        },
+        "required": [
+          "order_id"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "notify_admin_order",
+      "description": "Send the order, customer contact and payment link to the store admin on Telegram. Call this right after generate_invoice, for every order. If it fails, try once more; if it fails again, don't tell the customer the store has been notified.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "order_id": {
+            "type": "string",
+            "description": "The order_id from create_order."
+          },
+          "customer_summary": {
+            "type": "string",
+            "description": "One or two sentences the admin should know, such as delivery wishes."
+          },
+          "payment_link": {
+            "type": "string",
+            "description": "The payment_url from generate_invoice."
+          }
+        },
+        "required": [
+          "order_id",
+          "customer_summary",
+          "payment_link"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "escalate_to_human",
+      "description": "Alert the store admin that the customer needs a person, then stop handling the conversation. Call this when speech could not be understood three times in a row, or the customer is frustrated or asks for a human. If it fails, tell the customer you could not reach the manager instead of saying they are being connected.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Why a person is needed, in one short sentence."
+          },
+          "context_summary": {
+            "type": "string",
+            "description": "The items requested, the shipping address given so far, why the customer is being handed over, and the last thing they said."
+          },
+          "order_id": {
+            "type": "string",
+            "description": "The order this is about, if one was created."
+          },
+          "customer_telegram_id": {
+            "type": "string",
+            "description": "The caller's numeric Telegram id from the call or chat session."
+          }
+        },
+        "required": [
+          "reason",
+          "context_summary"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "describe_databases",
+      "description": "List the store's own connected databases (PostgreSQL, MySQL or SQLite) with their tables and columns. Call it when the customer asks something the catalog tools don't cover, such as delivery areas, branches, opening hours, prices or stock kept elsewhere, or past orders, before saying you don't know.",
+      "input_schema": {
+        "type": "object",
+        "properties": {},
+        "required": [],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "query_database",
+      "description": "Ask a connected database one read-only SQL SELECT and get up to 50 rows back. Use only tables and columns that describe_databases listed, and the SQL dialect of that database. Prefer WHERE, LIMIT and aggregates over reading whole tables. Answer the customer in plain words from the rows; never show them SQL, table names or raw rows.",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "database": {
+            "type": "string",
+            "description": "The database's name or id, as describe_databases gave it."
+          },
+          "sql": {
+            "type": "string",
+            "description": "One SELECT statement."
+          }
+        },
+        "required": [
+          "database",
+          "sql"
+        ],
+        "additionalProperties": false
+      }
+    }
+  ],
+  "endpoints": {
+    "search_catalog": {
+      "method": "GET",
+      "path": "/api/products/search",
+      "rename": {
+        "query": "q"
+      }
+    },
+    "check_stock": {
+      "method": "GET",
+      "path": "/api/products/{product_id}/stock"
+    },
+    "create_order": {
+      "method": "POST",
+      "path": "/api/orders",
+      "session_fields": [
+        "customer_telegram_id",
+        "customer_telegram_username"
+      ]
+    },
+    "generate_invoice": {
+      "method": "POST",
+      "path": "/api/payments/create-invoice",
+      "rename": {
+        "payment_provider": "provider"
+      },
+      "session_fields": [
+        "send_to_customer"
+      ]
+    },
+    "get_order_status": {
+      "method": "GET",
+      "path": "/api/orders/{order_id}/status",
+      "session_fields": [
+        "customer_telegram_id"
+      ]
+    },
+    "notify_admin_order": {
+      "method": "POST",
+      "path": "/api/admin/notify-order"
+    },
+    "escalate_to_human": {
+      "method": "POST",
+      "path": "/api/admin/escalate",
+      "session_fields": [
+        "customer_telegram_id",
+        "customer_telegram_username",
+        "customer_phone",
+        "last_spoken"
+      ]
+    },
+    "describe_databases": {
+      "method": "GET",
+      "path": "/api/knowledge/databases"
+    },
+    "query_database": {
+      "method": "POST",
+      "path": "/api/knowledge/query"
+    }
+  }
+}
